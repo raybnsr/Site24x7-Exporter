@@ -13,20 +13,20 @@ async function processSite24x7DataAndReturnPrometheusMetrics() {
 # HELP site24x7_server_disk_used_percent Disk Used Percentage
 # TYPE site24x7_server_disk_used_percent gauge
 ${site24x7Data.data.group_data.SERVER.name.map((serverName, index) => (
-  `site24x7_server_disk_used_percent{server="${serverName}", instance="localhost:3001"} ${sanitizeMetricValue(site24x7Data.data.group_data.SERVER.attribute_data[index]['0'].DISKUSEDPERCENT)}\n`
-)).join('')}
+  `site24x7_server_disk_used_percent{server="${serverName}", instance="localhost:3001"} ${sanitizeMetricValue(site24x7Data.data.group_data.SERVER.attribute_data[index]['0'].DISKUSEDPERCENT)}`
+)).join('\n')}
 
 # HELP site24x7_server_mem_used_percent Memory Used Percentage
 # TYPE site24x7_server_mem_used_percent gauge
 ${site24x7Data.data.group_data.SERVER.name.map((serverName, index) => (
-  `site24x7_server_mem_used_percent{server="${serverName}", instance="localhost:3001"} ${sanitizeMetricValue(site24x7Data.data.group_data.SERVER.attribute_data[index]['0'].MEMUSEDPERCENT)}\n`
-)).join('')}
+  `site24x7_server_mem_used_percent{server="${serverName}", instance="localhost:3001"} ${sanitizeMetricValue(site24x7Data.data.group_data.SERVER.attribute_data[index]['0'].MEMUSEDPERCENT)}`
+)).join('\n')}
 
 # HELP site24x7_server_cpu_used_percent CPU Used Percentage
 # TYPE site24x7_server_cpu_used_percent gauge
 ${site24x7Data.data.group_data.SERVER.name.map((serverName, index) => (
-  `site24x7_server_cpu_used_percent{server="${serverName}", instance="localhost:3001"} ${sanitizeMetricValue(site24x7Data.data.group_data.SERVER.attribute_data[index]['0'].CPUUSEDPERCENT)}\n`
-)).join('')}
+  `site24x7_server_cpu_used_percent{server="${serverName}", instance="localhost:3001"} ${sanitizeMetricValue(site24x7Data.data.group_data.SERVER.attribute_data[index]['0'].CPUUSEDPERCENT)}`
+)).join('\n')}
 `;
 
     return prometheusMetrics.trim();
@@ -49,8 +49,8 @@ async function processGlobalMonitorStatusAndReturnPrometheusMetrics() {
 # HELP site24x7_monitor_status Monitor Status
 # TYPE site24x7_monitor_status gauge
 ${monitorStatusData.data.map((monitor) => (
-  `site24x7_monitor_status{monitor_id="${monitor.monitor_id}", monitor_name="${monitor.monitor_name}", customer_name="${monitor.customer_name}"} ${sanitizeMetricValue(monitor.status)}\n`
-)).join('')}
+  `site24x7_monitor_status{monitor_id="${monitor.monitor_id}", monitor_name="${monitor.monitor_name}", customer_name="${monitor.customer_name}", status_name="${monitor.status_name}", monitor_type="${monitor.monitor_type}"} ${sanitizeMetricValue(monitor.status)}`
+)).join('\n')}
 `;
 
     return prometheusMetrics.trim();
@@ -143,15 +143,61 @@ async function processCurrentStatusAndReturnPrometheusMetrics() {
       return isNaN(parsedValue) ? '0.0' : parsedValue.toString();
     };
 
-    const prometheusMetrics = `
+    let prometheusMetrics = `
 # HELP site24x7_current_status Current Status of Monitors
 # TYPE site24x7_current_status gauge
-${currentStatusData.data.monitor_groups.map((group) => (
-  group.monitors?.map((monitor) => (
-    `site24x7_current_status{monitor_id="${monitor.monitor_id}", monitor_name="${monitor.name}", group_name="${group.group_name}", status="${monitor.status}", last_polled_time="${monitor.last_polled_time}", device_info="${monitor.device_info}", type="${monitor.type}", category="${monitor.category}"} ${sanitizeMetricValue(monitor.attribute_value)}\n`
-  )).join('')
-)).join('')}
 `;
+
+    currentStatusData.data.monitor_groups.forEach(group => {
+      if (group.group_name === "Server") {
+        group.monitors?.forEach(monitor => {
+          const labels = {
+            monitor_id: monitor.monitor_id,
+            monitor_name: monitor.name,
+            group_name: group.group_name,
+            status: monitor.status,
+            last_polled_time: monitor.last_polled_time,
+            device_info: monitor.device_info,
+            server_info: monitor.serverinfo,
+            server_version: monitor.server_version,
+            server_category: monitor.server_category,
+            attribute_key: monitor.attribute_key,
+            attribute_label: monitor.attribute_label,
+            monitor_type: monitor.monitor_type,
+            server_type: monitor.server_type
+          };
+
+          const labelString = Object.entries(labels)
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(', ');
+
+          prometheusMetrics += `
+site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_value)}
+`;
+        });
+      } else {
+        group.monitors?.forEach(monitor => {
+          const labels = {
+            monitor_id: monitor.monitor_id,
+            monitor_name: monitor.name,
+            group_name: group.group_name,
+            status: monitor.status,
+            last_polled_time: monitor.last_polled_time,
+            device_info: monitor.device_info,
+            type: monitor.type,
+            category: monitor.category
+          };
+
+          const labelString = Object.entries(labels)
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(', ');
+
+          prometheusMetrics += `
+site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_value)}
+`;
+        });
+      }
+    });
 
     return prometheusMetrics.trim();
   } catch (error) {

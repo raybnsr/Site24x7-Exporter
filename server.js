@@ -1,6 +1,11 @@
 const express = require('express');
-const { authenticate, getAccessToken } = require('./src/services/tokenManager'); 
-const { processSite24x7DataAndReturnPrometheusMetrics, processGlobalMonitorStatusAndReturnPrometheusMetrics, processSummaryReportAndReturnPrometheusMetrics, processCurrentStatusAndReturnPrometheusMetrics } = require('./src/controllers/metricsController');
+const { ensureTokenIsValid, getAccessToken } = require('./src/services/tokenManager'); 
+const { 
+  processSite24x7DataAndReturnPrometheusMetrics,
+  processGlobalMonitorStatusAndReturnPrometheusMetrics,
+  processSummaryReportAndReturnPrometheusMetrics,
+  processCurrentStatusAndReturnPrometheusMetrics 
+} = require('./src/controllers/metricsController');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,50 +25,40 @@ let lastFetchTimeSummaryReport = 0;
 let cachedCurrentStatusMetrics = null;
 let lastFetchTimeCurrentStatus = 0;
 
-let tokenExpirationTime = 0;
-
-async function ensureTokenIsValid() {
-  const currentTime = Date.now();
-  if (currentTime >= tokenExpirationTime) {
-    try {
-      await authenticate();
-      tokenExpirationTime = currentTime + 3600000;
-      console.log('Token has been refreshed:', new Date().toISOString());
-      const currentToken = getAccessToken();
-      console.log('Active token:', currentToken);
-    } catch (error) {
-      console.error('Failed to refresh token:', error);
-      throw error;
-    }
-  }
-}
-
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+  
+  try {
+    await ensureTokenIsValid();
+    const currentToken = getAccessToken();
+    console.log('Active token:', currentToken); // Display the active token
 
-  setInterval(async () => {
-    try {
-      await ensureTokenIsValid();
+    setInterval(async () => {
+      try {
+        await ensureTokenIsValid();
 
-      cachedMetrics = await processSite24x7DataAndReturnPrometheusMetrics();
-      lastFetchTime = Date.now();
-      console.log('Data has been fetched from Site24x7:', new Date().toISOString());
+        cachedMetrics = await processSite24x7DataAndReturnPrometheusMetrics();
+        lastFetchTime = Date.now();
+        console.log('Data has been fetched from Site24x7:', new Date());
 
-      cachedMonitorStatusMetrics = await processGlobalMonitorStatusAndReturnPrometheusMetrics();
-      lastFetchTimeMonitorStatus = Date.now();
-      console.log('Monitor status data has been fetched from Site24x7:', new Date().toISOString());
+        cachedMonitorStatusMetrics = await processGlobalMonitorStatusAndReturnPrometheusMetrics();
+        lastFetchTimeMonitorStatus = Date.now();
+        console.log('Monitor status data has been fetched from Site24x7:', new Date());
 
-      cachedSummaryReportMetrics = await processSummaryReportAndReturnPrometheusMetrics();
-      lastFetchTimeSummaryReport = Date.now();
-      console.log('Summary report data has been fetched from Site24x7:', new Date().toISOString());
+        cachedSummaryReportMetrics = await processSummaryReportAndReturnPrometheusMetrics();
+        lastFetchTimeSummaryReport = Date.now();
+        console.log('Summary report data has been fetched from Site24x7:', new Date());
 
-      cachedCurrentStatusMetrics = await processCurrentStatusAndReturnPrometheusMetrics();
-      lastFetchTimeCurrentStatus = Date.now();
-      console.log('Current status data has been fetched from Site24x7:', new Date().toISOString());
-    } catch (error) {
-      console.error('Error processing and returning Prometheus metrics:', error);
-    }
-  }, 3600000);
+        cachedCurrentStatusMetrics = await processCurrentStatusAndReturnPrometheusMetrics();
+        lastFetchTimeCurrentStatus = Date.now();
+        console.log('Current status data has been fetched from Site24x7:', new Date());
+      } catch (error) {
+        console.error('Error processing and returning Prometheus metrics:', error);
+      }
+    }, 3600000);
+  } catch (error) {
+    console.error('Failed to ensure token is valid on server start:', error);
+  }
 });
 
 app.get('/metrics', async (req, res) => {
