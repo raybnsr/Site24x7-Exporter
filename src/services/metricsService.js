@@ -18,8 +18,7 @@ async function fetchDataFromSite24x7() {
     const response = await axios.get('https://www.site24x7.com/api/reports/performance/type/SERVER?period=0&metric_aggregation=0', config);
     return response.data;
   } catch (error) {
-    console.error('Failed to fetch data from Site24x7 API:', error.response ? error.response.data : error.message);
-    throw error;
+    throw new Error(`Failed to fetch data from Site24x7 API: ${error.response ? error.response.data : error.message}`);
   }
 }
 
@@ -39,8 +38,7 @@ async function fetchGlobalMonitorStatus() {
     const response = await axios.get('https://www.site24x7.com/api/msp/monitors/status', config);
     return response.data;
   } catch (error) {
-    console.error('Failed to fetch global monitor status from Site24x7 API:', error.response ? error.response.data : error.message);
-    throw error;
+    throw new Error(`Failed to fetch global monitor status from Site24x7 API: ${error.response ? error.response.data : error.message}`);
   }
 }
 
@@ -60,8 +58,7 @@ async function fetchSummaryReport() {
     const response = await axios.get('https://www.site24x7.com/api/reports/summary?period=0', config);
     return response.data;
   } catch (error) {
-    console.error('Failed to fetch summary report from Site24x7 API:', error.response ? error.response.data : error.message);
-    throw error;
+    throw new Error(`Failed to fetch summary report from Site24x7 API: ${error.response ? error.response.data : error.message}`);
   }
 }
 
@@ -81,8 +78,7 @@ async function fetchCurrentStatusData() {
     const response = await axios.get('https://www.site24x7.com/api/current_status?apm_required=true&group_required=true&locations_required=true&suspended_required=true', config);
     return response.data;
   } catch (error) {
-    console.error('Failed to fetch current status from Site24x7 API:', error.response ? error.response.data : error.message);
-    throw error;
+    throw new Error(`Failed to fetch current status from Site24x7 API: ${error.response ? error.response.data : error.message}`);
   }
 }
 

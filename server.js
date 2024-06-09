@@ -26,32 +26,23 @@ let cachedCurrentStatusMetrics = null;
 let lastFetchTimeCurrentStatus = 0;
 
 app.listen(PORT, async () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  
   try {
     await ensureTokenIsValid();
-    const currentToken = getAccessToken();
-    console.log('Active token:', currentToken); // Display the active token
-
     setInterval(async () => {
       try {
         await ensureTokenIsValid();
 
         cachedMetrics = await processSite24x7DataAndReturnPrometheusMetrics();
         lastFetchTime = Date.now();
-        console.log('Data has been fetched from Site24x7:', new Date());
 
         cachedMonitorStatusMetrics = await processGlobalMonitorStatusAndReturnPrometheusMetrics();
         lastFetchTimeMonitorStatus = Date.now();
-        console.log('Monitor status data has been fetched from Site24x7:', new Date());
 
         cachedSummaryReportMetrics = await processSummaryReportAndReturnPrometheusMetrics();
         lastFetchTimeSummaryReport = Date.now();
-        console.log('Summary report data has been fetched from Site24x7:', new Date());
 
         cachedCurrentStatusMetrics = await processCurrentStatusAndReturnPrometheusMetrics();
         lastFetchTimeCurrentStatus = Date.now();
-        console.log('Current status data has been fetched from Site24x7:', new Date());
       } catch (error) {
         console.error('Error processing and returning Prometheus metrics:', error);
       }
