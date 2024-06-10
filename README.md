@@ -119,7 +119,7 @@ We welcome contributions to this project. To contribute, please follow these ste
 - Fork the repository on GitHub.
 - Clone your fork to your local machine
 ```bash
-git clone https://github.com/yourusername/site24x7-exporter.git
+git clone https://github.com/raybnsr/site24x7-exporter.git
 ```
 - Create a new branch for your feature or bugfix:
 ```bash
