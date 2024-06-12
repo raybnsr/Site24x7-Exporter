@@ -108,8 +108,8 @@ async function processCurrentStatusAndReturnPrometheusMetrics() {
   try {
     const currentStatusData = await fetchCurrentStatusData();
 
-    if (!currentStatusData.data || !Array.isArray(currentStatusData.data.monitors)) {
-      throw new Error('Expected currentStatusData.data.monitors to be an array');
+    if (!currentStatusData.data || !Array.isArray(currentStatusData.data.monitor_groups)) {
+      throw new Error('Expected currentStatusData.data.monitor_groups to be an array');
     }
 
     const sanitizeMetricValue = (value) => {
@@ -117,19 +117,69 @@ async function processCurrentStatusAndReturnPrometheusMetrics() {
       return isNaN(parsedValue) ? '0.0' : parsedValue.toString();
     };
 
-    const prometheusMetrics = `
+    let prometheusMetrics = `
 # HELP site24x7_current_status Monitor Current Status
 # TYPE site24x7_current_status gauge
-${currentStatusData.data.monitors.map((monitor) => (
-  `site24x7_current_status{monitor_id="${monitor.monitor_id}", monitor_name="${monitor.monitor_name}", customer_name="${monitor.customer_name}", status_name="${monitor.status_name}", monitor_type="${monitor.monitor_type}"} ${sanitizeMetricValue(monitor.status)}`
-)).join('\n')}
 `;
+
+    currentStatusData.data.monitor_groups.forEach(group => {
+      if (group.group_name === "Server") {
+        group.monitors?.forEach(monitor => {
+          const labels = {
+            monitor_id: monitor.monitor_id,
+            monitor_name: monitor.name,
+            group_name: group.group_name,
+            status: monitor.status,
+            last_polled_time: monitor.last_polled_time,
+            device_info: monitor.device_info,
+            server_info: monitor.serverinfo,
+            server_version: monitor.server_version,
+            server_category: monitor.server_category,
+            attribute_key: monitor.attribute_key,
+            attribute_label: monitor.attribute_label,
+            monitor_type: monitor.monitor_type,
+            server_type: monitor.server_type
+          };
+
+          const labelString = Object.entries(labels)
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(', ');
+
+          prometheusMetrics += `
+site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_value)}
+`;
+        });
+      } else {
+        group.monitors?.forEach(monitor => {
+          const labels = {
+            monitor_id: monitor.monitor_id,
+            monitor_name: monitor.name,
+            group_name: group.group_name,
+            status: monitor.status,
+            last_polled_time: monitor.last_polled_time,
+            device_info: monitor.device_info,
+            type: monitor.type,
+            category: monitor.category
+          };
+
+          const labelString = Object.entries(labels)
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(', ');
+
+          prometheusMetrics += `
+site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_value)}
+`;
+        });
+      }
+    });
 
     return prometheusMetrics.trim();
   } catch (error) {
+    console.error('Error processing Current Status data and returning Prometheus metrics:', error);
     throw new Error(`Error processing current status data and returning Prometheus metrics: ${error.message}`);
   }
 }
+
 
 module.exports = {
   processSite24x7DataAndReturnPrometheusMetrics,
