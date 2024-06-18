@@ -4,7 +4,11 @@ const {
   processSite24x7DataAndReturnPrometheusMetrics,
   processGlobalMonitorStatusAndReturnPrometheusMetrics,
   processSummaryReportAndReturnPrometheusMetrics,
-  processCurrentStatusAndReturnPrometheusMetrics 
+  processCurrentStatusAndReturnPrometheusMetrics,
+  processNewCurrentStatusAndReturnPrometheusMetrics,
+  processTrendReportAndReturnPrometheusMetrics,
+  processTopNAvailabilityAndReturnPrometheusMetrics,
+  processTopNServerAndReturnPrometheusMetrics
 } = require('./src/controllers/metricsController');
 
 const app = express();
@@ -25,6 +29,18 @@ let lastFetchTimeSummaryReport = 0;
 let cachedCurrentStatusMetrics = null;
 let lastFetchTimeCurrentStatus = 0;
 
+let cachedCurrentStatusNewEndpointMetrics = null;
+let lastFetchTimeCurrentStatusNewEndpoint = 0;
+
+let cachedTrendReportMetrics = null;
+let lastFetchTimeTrendReport = 0;
+
+let cachedTopNAvailabilityMetrics = null;
+let lastFetchTimeTopNAvailability = 0;
+
+let cachedTopNServerMetrics = null;
+let lastFetchTimeTopNServer = 0;
+
 app.listen(PORT, async () => {
   try {
     await ensureTokenIsValid();
@@ -43,6 +59,18 @@ app.listen(PORT, async () => {
 
         cachedCurrentStatusMetrics = await processCurrentStatusAndReturnPrometheusMetrics();
         lastFetchTimeCurrentStatus = Date.now();
+
+        cachedCurrentStatusNewEndpointMetrics = await processNewCurrentStatusAndReturnPrometheusMetrics();
+        lastFetchTimeCurrentStatusNewEndpoint = Date.now();
+
+        cachedTrendReportMetrics = await processTrendReportAndReturnPrometheusMetrics();
+        lastFetchTimeTrendReport = Date.now();
+
+        cachedTopNAvailabilityMetrics = await processTopNAvailabilityAndReturnPrometheusMetrics();
+        lastFetchTimeTopNAvailability = Date.now();
+
+        cachedTopNServerMetrics = await processTopNServerAndReturnPrometheusMetrics();
+        lastFetchTimeTopNServer = Date.now();
       } catch (error) {
         console.error('Error processing and returning Prometheus metrics:', error);
       }
@@ -78,6 +106,31 @@ app.get('/metrics', async (req, res) => {
       lastFetchTimeCurrentStatus = currentTime;
     }
 
+    if (!cachedCurrentStatusNewEndpointMetrics || currentTime - lastFetchTimeCurrentStatusNewEndpoint > 3600000) {
+      cachedCurrentStatusNewEndpointMetrics = await processNewCurrentStatusAndReturnPrometheusMetrics();
+      lastFetchTimeCurrentStatusNewEndpoint = currentTime;
+    }
+
+    if (!cachedCurrentStatusNewEndpointMetrics || currentTime - lastFetchTimeCurrentStatusNewEndpoint > 3600000) {
+        cachedCurrentStatusNewEndpointMetrics = await processTrendReportAndReturnPrometheusMetrics();
+        lastFetchTimeCurrentStatusNewEndpoint = currentTime;
+      }
+
+    if (!cachedTrendReportMetrics || currentTime - lastFetchTimeTrendReport > 3600000) {
+        cachedTrendReportMetrics = await processTrendReportAndReturnPrometheusMetrics();
+        lastFetchTimeTrendReport = currentTime;
+      }
+
+    if (!cachedTopNAvailabilityMetrics || currentTime - lastFetchTimeTopNAvailability > 3600000) {
+      cachedTopNAvailabilityMetrics = await processTopNAvailabilityAndReturnPrometheusMetrics();
+      lastFetchTimeTopNAvailability = currentTime;
+    }
+
+    if (!cachedTopNServerMetrics || currentTime - lastFetchTimeTopNServer > 3600000) {
+      cachedTopNServerMetrics = await processTopNServerAndReturnPrometheusMetrics();
+      lastFetchTimeTopNServer = currentTime;
+    }
+
     const allMetrics = `
 ${cachedMetrics}
 
@@ -86,6 +139,14 @@ ${cachedMonitorStatusMetrics}
 ${cachedSummaryReportMetrics}
 
 ${cachedCurrentStatusMetrics}
+
+${cachedCurrentStatusNewEndpointMetrics}
+
+${cachedTrendReportMetrics}
+
+${cachedTopNAvailabilityMetrics}
+
+${cachedTopNServerMetrics}
 `.trim();
 
     res.set('Content-Type', 'text/plain');
