@@ -67,6 +67,10 @@ async function processSummaryReportAndReturnPrometheusMetrics() {
       return isNaN(parsedValue) ? '0.0' : parsedValue.toString();
     };
 
+    const sanitizeMetricName = (name) => {
+      return name.replace(/[^a-zA-Z0-9_]/g, '_');
+    };
+
     const summaryDetails = summaryData.data.summary_details;
     const performanceDetails = summaryData.data.performance_details;
 
@@ -77,26 +81,49 @@ site24x7_summary_availability_percentage ${sanitizeMetricValue(summaryDetails.av
 
 # HELP site24x7_summary_downtime_duration_total Downtime Duration Total
 # TYPE site24x7_summary_downtime_duration_total gauge
-site24x7_summary_downtime_duration_total ${sanitizeMetricValue(summaryDetails.down_duration)}
+site24x7_summary_downtime_duration_total ${sanitizeMetricValue(summaryDetails.downtime_duration)}
 
 # HELP site24x7_summary_downtime_count_total Downtime Count Total
 # TYPE site24x7_summary_downtime_count_total gauge
 site24x7_summary_downtime_count_total ${sanitizeMetricValue(summaryDetails.down_count)}
+
+# HELP site24x7_summary_alarm_count_total Alarm Count Total
+# TYPE site24x7_summary_alarm_count_total gauge
+site24x7_summary_alarm_count_total ${sanitizeMetricValue(summaryDetails.alarm_count)}
+
+# HELP site24x7_summary_maintenance_percentage Maintenance Percentage
+# TYPE site24x7_summary_maintenance_percentage gauge
+site24x7_summary_maintenance_percentage ${sanitizeMetricValue(summaryDetails.maintenance_percentage)}
+
+# HELP site24x7_summary_unmanaged_percentage Unmanaged Percentage
+# TYPE site24x7_summary_unmanaged_percentage gauge
+site24x7_summary_unmanaged_percentage ${sanitizeMetricValue(summaryDetails.unmanaged_percentage)}
 `;
 
-    prometheusMetrics += `
-# HELP site24x7_summary_performance_response_time_average Performance Response Time Average
-# TYPE site24x7_summary_performance_response_time_average gauge
-site24x7_summary_performance_response_time_average ${sanitizeMetricValue(performanceDetails.avg_response_time)}
+    const addPerformanceMetrics = (category, metrics) => {
+      metrics.forEach((metric, index) => {
+        const name = sanitizeMetricName(performanceDetails[category].name[index]);
+        prometheusMetrics += `
+# HELP site24x7_${sanitizeMetricName(category.toLowerCase())}_${name}_availability Availability for ${name}
+# TYPE site24x7_${sanitizeMetricName(category.toLowerCase())}_${name}_availability gauge
+site24x7_${sanitizeMetricName(category.toLowerCase())}_${name}_availability ${sanitizeMetricValue(performanceDetails[category].availability[index])}
+        `;
 
-# HELP site24x7_summary_performance_response_time_maximum Performance Response Time Maximum
-# TYPE site24x7_summary_performance_response_time_maximum gauge
-site24x7_summary_performance_response_time_maximum ${sanitizeMetricValue(performanceDetails.max_response_time)}
+        const attributes = performanceDetails[category].attribute_data[index]['0'];
+        for (const [key, value] of Object.entries(attributes)) {
+          prometheusMetrics += `
+# HELP site24x7_${sanitizeMetricName(category.toLowerCase())}_${name}_${sanitizeMetricName(key.toLowerCase())} ${key} for ${name}
+# TYPE site24x7_${sanitizeMetricName(category.toLowerCase())}_${name}_${sanitizeMetricName(key.toLowerCase())} gauge
+site24x7_${sanitizeMetricName(category.toLowerCase())}_${name}_${sanitizeMetricName(key.toLowerCase())} ${sanitizeMetricValue(value)}
+          `;
+        }
+      });
+    };
 
-# HELP site24x7_summary_performance_response_time_minimum Performance Response Time Minimum
-# TYPE site24x7_summary_performance_response_time_minimum gauge
-site24x7_summary_performance_response_time_minimum ${sanitizeMetricValue(performanceDetails.min_response_time)}
-`;
+    for (const category of Object.keys(performanceDetails)) {
+      addPerformanceMetrics(category, performanceDetails[category].name);
+    }
+
 
     return prometheusMetrics.trim();
   } catch (error) {
@@ -118,8 +145,8 @@ async function processCurrentStatusAndReturnPrometheusMetrics() {
     };
 
     let prometheusMetrics = `
-# HELP site24x7_current_status Monitor Current Status
-# TYPE site24x7_current_status gauge
+# HELP site24x7_monitor_current_status Monitor Current Status
+# TYPE site24x7_monitor_current_status gauge
 `;
 
     currentStatusData.data.monitor_groups.forEach(group => {
@@ -148,7 +175,7 @@ async function processCurrentStatusAndReturnPrometheusMetrics() {
             .join(', ');
 
           prometheusMetrics += `
-site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_value)}
+site24x7_monitor_current_status{${labelString}} ${sanitizeMetricValue(monitor.status)}
 `;
         });
       } else {
@@ -169,7 +196,7 @@ site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_
             .join(', ');
 
           prometheusMetrics += `
-site24x7_current_status{${labelString}} ${sanitizeMetricValue(monitor.attribute_value)}
+site24x7_monitor_current_status{${labelString}} ${sanitizeMetricValue(monitor.status)}
 `;
         });
       }
@@ -275,7 +302,8 @@ site24x7_monitor_suspended ${sanitizeMetricValue(monitorsCount.suspended)}
         .join(', ');
 
       prometheusMetrics += `
-site24x7_current_status{${labelString}} ${labels.attribute_value}
+site24x7_current_status_details{${labelString}} ${labels.attribute_value}
+site24x7_current_status{${labelString}} ${labels.status}
 `;
     });
 
