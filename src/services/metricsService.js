@@ -25,7 +25,7 @@ async function fetchDataFromSite24x7() {
 async function fetchGlobalMonitorStatus() {
   try {
     const accessToken = getAccessToken();
-    const zaaid = process.env.ZAAID;
+    // const zaaid = process.env.ZAAID;
 
     const config = {
       headers: {

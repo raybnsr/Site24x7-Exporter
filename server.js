@@ -1,5 +1,5 @@
 const express = require('express');
-const { ensureTokenIsValid, getAccessToken } = require('./src/services/tokenManager'); 
+const { ensureTokenIsValid } = require('./src/services/tokenManager');
 const { 
   processSite24x7DataAndReturnPrometheusMetrics,
   processGlobalMonitorStatusAndReturnPrometheusMetrics,
@@ -19,62 +19,49 @@ app.use(express.urlencoded({ extended: true }));
 
 let cachedMetrics = null;
 let lastFetchTime = 0;
+const CACHE_DURATION = 3600000; // 1 hour in milliseconds
 
-let cachedMonitorStatusMetrics = null;
-let lastFetchTimeMonitorStatus = 0;
+const fetchAllMetrics = async () => {
+  await ensureTokenIsValid();
 
-let cachedSummaryReportMetrics = null;
-let lastFetchTimeSummaryReport = 0;
+  const [
+    site24x7Metrics,
+    globalMonitorStatusMetrics,
+    summaryReportMetrics,
+    currentStatusMetrics,
+    newCurrentStatusMetrics,
+    trendReportMetrics,
+    topNAvailabilityMetrics,
+    topNServerMetrics
+  ] = await Promise.all([
+    processSite24x7DataAndReturnPrometheusMetrics(),
+    processGlobalMonitorStatusAndReturnPrometheusMetrics(),
+    processSummaryReportAndReturnPrometheusMetrics(),
+    processCurrentStatusAndReturnPrometheusMetrics(),
+    processNewCurrentStatusAndReturnPrometheusMetrics(),
+    processTrendReportAndReturnPrometheusMetrics(),
+    processTopNAvailabilityAndReturnPrometheusMetrics(),
+    processTopNServerAndReturnPrometheusMetrics()
+  ]);
 
-let cachedCurrentStatusMetrics = null;
-let lastFetchTimeCurrentStatus = 0;
-
-let cachedCurrentStatusNewEndpointMetrics = null;
-let lastFetchTimeCurrentStatusNewEndpoint = 0;
-
-let cachedTrendReportMetrics = null;
-let lastFetchTimeTrendReport = 0;
-
-let cachedTopNAvailabilityMetrics = null;
-let lastFetchTimeTopNAvailability = 0;
-
-let cachedTopNServerMetrics = null;
-let lastFetchTimeTopNServer = 0;
+  cachedMetrics = {
+    site24x7Metrics,
+    globalMonitorStatusMetrics,
+    summaryReportMetrics,
+    currentStatusMetrics,
+    newCurrentStatusMetrics,
+    trendReportMetrics,
+    topNAvailabilityMetrics,
+    topNServerMetrics
+  };
+  lastFetchTime = Date.now();
+};
 
 app.listen(PORT, async () => {
   try {
     await ensureTokenIsValid();
-    setInterval(async () => {
-      try {
-        await ensureTokenIsValid();
-
-        cachedMetrics = await processSite24x7DataAndReturnPrometheusMetrics();
-        lastFetchTime = Date.now();
-
-        cachedMonitorStatusMetrics = await processGlobalMonitorStatusAndReturnPrometheusMetrics();
-        lastFetchTimeMonitorStatus = Date.now();
-
-        cachedSummaryReportMetrics = await processSummaryReportAndReturnPrometheusMetrics();
-        lastFetchTimeSummaryReport = Date.now();
-
-        cachedCurrentStatusMetrics = await processCurrentStatusAndReturnPrometheusMetrics();
-        lastFetchTimeCurrentStatus = Date.now();
-
-        cachedCurrentStatusNewEndpointMetrics = await processNewCurrentStatusAndReturnPrometheusMetrics();
-        lastFetchTimeCurrentStatusNewEndpoint = Date.now();
-
-        cachedTrendReportMetrics = await processTrendReportAndReturnPrometheusMetrics();
-        lastFetchTimeTrendReport = Date.now();
-
-        cachedTopNAvailabilityMetrics = await processTopNAvailabilityAndReturnPrometheusMetrics();
-        lastFetchTimeTopNAvailability = Date.now();
-
-        cachedTopNServerMetrics = await processTopNServerAndReturnPrometheusMetrics();
-        lastFetchTimeTopNServer = Date.now();
-      } catch (error) {
-        console.error('Error processing and returning Prometheus metrics:', error);
-      }
-    }, 3600000);
+    setInterval(fetchAllMetrics, CACHE_DURATION);
+    console.log(`Server is running on http://localhost:${PORT}`);
   } catch (error) {
     console.error('Failed to ensure token is valid on server start:', error);
   }
@@ -84,69 +71,26 @@ app.get('/metrics', async (req, res) => {
   try {
     const currentTime = Date.now();
 
-    await ensureTokenIsValid();
-
-    if (!cachedMetrics || currentTime - lastFetchTime > 3600000) {
-      cachedMetrics = await processSite24x7DataAndReturnPrometheusMetrics();
-      lastFetchTime = currentTime;
-    }
-
-    if (!cachedMonitorStatusMetrics || currentTime - lastFetchTimeMonitorStatus > 3600000) {
-      cachedMonitorStatusMetrics = await processGlobalMonitorStatusAndReturnPrometheusMetrics();
-      lastFetchTimeMonitorStatus = currentTime;
-    }
-
-    if (!cachedSummaryReportMetrics || currentTime - lastFetchTimeSummaryReport > 3600000) {
-      cachedSummaryReportMetrics = await processSummaryReportAndReturnPrometheusMetrics();
-      lastFetchTimeSummaryReport = currentTime;
-    }
-
-    if (!cachedCurrentStatusMetrics || currentTime - lastFetchTimeCurrentStatus > 3600000) {
-      cachedCurrentStatusMetrics = await processCurrentStatusAndReturnPrometheusMetrics();
-      lastFetchTimeCurrentStatus = currentTime;
-    }
-
-    if (!cachedCurrentStatusNewEndpointMetrics || currentTime - lastFetchTimeCurrentStatusNewEndpoint > 3600000) {
-      cachedCurrentStatusNewEndpointMetrics = await processNewCurrentStatusAndReturnPrometheusMetrics();
-      lastFetchTimeCurrentStatusNewEndpoint = currentTime;
-    }
-
-    if (!cachedCurrentStatusNewEndpointMetrics || currentTime - lastFetchTimeCurrentStatusNewEndpoint > 3600000) {
-        cachedCurrentStatusNewEndpointMetrics = await processTrendReportAndReturnPrometheusMetrics();
-        lastFetchTimeCurrentStatusNewEndpoint = currentTime;
-      }
-
-    if (!cachedTrendReportMetrics || currentTime - lastFetchTimeTrendReport > 3600000) {
-        cachedTrendReportMetrics = await processTrendReportAndReturnPrometheusMetrics();
-        lastFetchTimeTrendReport = currentTime;
-      }
-
-    if (!cachedTopNAvailabilityMetrics || currentTime - lastFetchTimeTopNAvailability > 3600000) {
-      cachedTopNAvailabilityMetrics = await processTopNAvailabilityAndReturnPrometheusMetrics();
-      lastFetchTimeTopNAvailability = currentTime;
-    }
-
-    if (!cachedTopNServerMetrics || currentTime - lastFetchTimeTopNServer > 3600000) {
-      cachedTopNServerMetrics = await processTopNServerAndReturnPrometheusMetrics();
-      lastFetchTimeTopNServer = currentTime;
+    if (!cachedMetrics || currentTime - lastFetchTime > CACHE_DURATION) {
+      await fetchAllMetrics();
     }
 
     const allMetrics = `
-${cachedMetrics}
+${cachedMetrics.site24x7Metrics}
 
-${cachedMonitorStatusMetrics}
+${cachedMetrics.globalMonitorStatusMetrics}
 
-${cachedSummaryReportMetrics}
+${cachedMetrics.summaryReportMetrics}
 
-${cachedCurrentStatusMetrics}
+${cachedMetrics.currentStatusMetrics}
 
-${cachedCurrentStatusNewEndpointMetrics}
+${cachedMetrics.newCurrentStatusMetrics}
 
-${cachedTrendReportMetrics}
+${cachedMetrics.trendReportMetrics}
 
-${cachedTopNAvailabilityMetrics}
+${cachedMetrics.topNAvailabilityMetrics}
 
-${cachedTopNServerMetrics}
+${cachedMetrics.topNServerMetrics}
 `.trim();
 
     res.set('Content-Type', 'text/plain');
