@@ -131,6 +131,3 @@ git checkout -b feature-or-bugfix-name
 git push origin feature-or-bugfix-name
 ```
 - Create a pull request to the main repository.
-
-## License
-This project is licensed under the MIT License. See the LICENSE file for more details.
